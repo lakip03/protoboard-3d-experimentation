@@ -210,7 +210,7 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
           
           // Load LED states if available
           if (config.ledStates && Array.isArray(config.ledStates)) {
-            const newLedStates = new Map(config.ledStates)
+            const newLedStates = new Map(config.ledStates as [string, LEDState][])
             setLedStates(newLedStates)
           } else {
             // Initialize LED states for imported LEDs
@@ -232,7 +232,7 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
         } else {
           alert('Invalid configuration file format')
         }
-      } catch (error) {
+      } catch {
         alert('Error reading configuration file')
       }
     }

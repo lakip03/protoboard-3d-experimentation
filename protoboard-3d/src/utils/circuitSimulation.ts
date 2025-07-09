@@ -434,6 +434,22 @@ export class CircuitSimulator {
     return null
   }
 
+  private hasWireConnections(nodeId: string): boolean {
+    const node = this.nodes.get(nodeId)
+    if (!node) return false
+    
+    // Check if there are any wire connections to this node
+    for (const [, component] of this.components) {
+      if (component.type === 'wire') {
+        if (component.startNode === nodeId || component.endNode === nodeId) {
+          return true
+        }
+      }
+    }
+    
+    return false
+  }
+
   private isConnectedToBattery(nodeId: string, terminal: 'positive' | 'negative'): boolean {
     const terminalId = terminal === 'positive' ? 'battery-positive' : 'battery-negative'
     const visited = new Set<string>()
@@ -554,13 +570,12 @@ export class CircuitSimulator {
         if (component.type === 'led') {
           const forwardVoltage = component.forwardVoltage || 2.0
           
-          // Check if this specific LED has a complete path to both battery terminals
-          const hasPathToPositive = this.isConnectedToBattery(component.startNode, 'positive') || 
-                                   this.isConnectedToBattery(component.endNode, 'positive')
-          const hasPathToNegative = this.isConnectedToBattery(component.startNode, 'negative') || 
-                                   this.isConnectedToBattery(component.endNode, 'negative')
+          // Check if both ends of the LED have wire connections
+          const startHasWire = this.hasWireConnections(component.startNode)
+          const endHasWire = this.hasWireConnections(component.endNode)
           
-          const hasCompleteLEDPath = hasPathToPositive && hasPathToNegative
+          // LED needs wires connected to both ends
+          const hasCompleteLEDPath = startHasWire && endHasWire
           
           // For LEDs, use forced voltage for display and logic
           const actualVoltage = this.batteryVoltage
