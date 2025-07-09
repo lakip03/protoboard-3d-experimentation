@@ -39,7 +39,13 @@ export default function SideMenu() {
     isPlacingLED,
     isDeleteMode,
     setIsDeleteMode,
-    placedComponents
+    placedComponents,
+    runCircuitSimulation,
+    circuitSimulation,
+    showInstructions,
+    setShowInstructions,
+    isCircuitRunning,
+    ledStates
   } = useComponents()
 
   const handleComponentClick = (component: Component) => {
@@ -73,16 +79,76 @@ export default function SideMenu() {
 
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           <div className="space-y-6">
-            {/* Run Circuit Button */}
+            {/* Run/Stop Circuit Button */}
             <div className="mb-6">
               <button
-                onClick={() => {/* TODO: Add circuit simulation */}}
-                className="w-full p-4 rounded-xl border-3 text-center transition-all duration-200 transform hover:scale-105 border-green-500 bg-green-100 hover:bg-green-200 shadow-lg"
+                onClick={runCircuitSimulation}
+                className={`w-full p-4 rounded-xl border-3 text-center transition-all duration-200 transform hover:scale-105 shadow-lg ${
+                  isCircuitRunning 
+                    ? 'border-red-500 bg-red-100 hover:bg-red-200' 
+                    : 'border-green-500 bg-green-100 hover:bg-green-200'
+                }`}
               >
                 <div className="flex items-center justify-center space-x-3">
-                  <div className="text-2xl">⚡</div>
-                  <div className="font-bold text-green-800 text-lg">
-                    Run Circuit
+                  <div className="text-2xl">{isCircuitRunning ? '⏹️' : '⚡'}</div>
+                  <div className={`font-bold text-lg ${
+                    isCircuitRunning ? 'text-red-800' : 'text-green-800'
+                  }`}>
+                    {isCircuitRunning ? 'Stop Circuit' : 'Run Circuit'}
+                  </div>
+                </div>
+              </button>
+              
+              {/* Circuit Status */}
+              {isCircuitRunning && circuitSimulation && (
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm font-medium text-blue-700">
+                    {circuitSimulation.isComplete ? 
+                      "✅ Circuit is working!" : 
+                      "❌ Circuit incomplete"}
+                  </p>
+                  {circuitSimulation.hasShortCircuit && (
+                    <p className="text-xs text-red-600 mt-1">⚠️ Short circuit detected!</p>
+                  )}
+                </div>
+              )}
+              
+              {/* LED Status */}
+              {isCircuitRunning && ledStates.size > 0 && (
+                <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <p className="text-sm font-medium text-yellow-700 mb-2">💡 LED Status:</p>
+                  {Array.from(ledStates.entries()).map(([id, state]) => (
+                    <div key={id} className="text-xs text-yellow-600">
+                      LED {id.slice(-4)}: {
+                        state.isBurned ? '💥 BURNED' : 
+                        state.isOn ? '✅ ON' : 
+                        '⚫ OFF'
+                      } ({(state.current * 1000).toFixed(1)}mA)
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Reset Info */}
+              {!isCircuitRunning && ledStates.size > 0 && (
+                <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm font-medium text-green-700">
+                    🔧 All LEDs have been repaired and reset
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Instructions Button */}
+            <div className="mb-6">
+              <button
+                onClick={() => setShowInstructions(!showInstructions)}
+                className="w-full p-4 rounded-xl border-3 text-center transition-all duration-200 transform hover:scale-105 border-blue-500 bg-blue-100 hover:bg-blue-200 shadow-lg"
+              >
+                <div className="flex items-center justify-center space-x-3">
+                  <div className="text-2xl">📚</div>
+                  <div className="font-bold text-blue-800 text-lg">
+                    {showInstructions ? 'Hide Instructions' : 'Show Instructions'}
                   </div>
                 </div>
               </button>
@@ -111,6 +177,41 @@ export default function SideMenu() {
                 </p>
               )}
             </div>
+
+          {/* Instructions Panel */}
+          {showInstructions && (
+            <div className="mb-6 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
+              <h3 className="text-lg font-bold text-purple-800 mb-3 flex items-center gap-2">
+                🎓 How to Build Circuits
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="p-2 bg-white rounded-lg border border-purple-100">
+                  <p className="font-medium text-purple-700">🔋 Step 1: Connect Battery</p>
+                  <p className="text-purple-600">Connect a wire from the RED (+) terminal to start</p>
+                </div>
+                <div className="p-2 bg-white rounded-lg border border-purple-100">
+                  <p className="font-medium text-purple-700">💡 Step 2: Add LED</p>
+                  <p className="text-purple-600">Look for + and - symbols • Green ring = positive • Red ring = negative</p>
+                </div>
+                <div className="p-2 bg-white rounded-lg border border-purple-100">
+                  <p className="font-medium text-purple-700">⚡ Step 3: Add Resistor</p>
+                  <p className="text-purple-600">Use 220Ω resistor to protect your LED from burning!</p>
+                </div>
+                <div className="p-2 bg-white rounded-lg border border-purple-100">
+                  <p className="font-medium text-purple-700">🔌 Step 4: Complete Circuit</p>
+                  <p className="text-purple-600">Connect back to BLACK (-) terminal</p>
+                </div>
+                <div className="p-2 bg-green-50 rounded-lg border border-green-200">
+                  <p className="font-medium text-green-700">✨ Remember:</p>
+                  <p className="text-green-600">LEDs: 1 hole apart • Resistors: 2 holes apart</p>
+                </div>
+                <div className="p-2 bg-purple-50 rounded-lg border border-purple-200">
+                  <p className="font-medium text-purple-700">🔄 Circuit Control:</p>
+                  <p className="text-purple-600">Press &quot;Run Circuit&quot; to start • Press &quot;Stop Circuit&quot; to reset & repair LEDs</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">

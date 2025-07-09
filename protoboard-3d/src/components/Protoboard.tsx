@@ -25,7 +25,8 @@ export function Protoboard() {
     setIsPlacingLED,
     ledStartPosition,
     setLEDStartPosition,
-    isDeleteMode
+    isDeleteMode,
+    circuitSimulation
   } = useComponents()
   
   const [hoveredHole, setHoveredHole] = useState<[number, number] | null>(null)
@@ -126,12 +127,19 @@ export function Protoboard() {
           
           if (isValidPlacement) {
             const ledId = Date.now().toString()
+            
+            // Determine polarity based on placement direction
+            // If placed left-to-right or top-to-bottom, it's normal
+            // If placed right-to-left or bottom-to-top, it's reversed
+            const isReversed = (endCol < startCol) || (endRow < startRow)
+            
             addComponent({
               id: ledId,
               type: 'led',
               position: ledStartPosition,
               endPosition: position,
-              color: selectedComponent.color || '#ff0000'
+              color: selectedComponent.color || '#ff0000',
+              polarity: isReversed ? 'reversed' : 'normal'
             })
             setIsPlacingLED(false)
             setLEDStartPosition(null)
@@ -218,6 +226,7 @@ export function Protoboard() {
             />
           )
         } else if (component.type === 'led' && component.endPosition) {
+          const circuitState = circuitSimulation?.components[component.id]
           return (
             <LED3D
               key={component.id}
@@ -226,9 +235,13 @@ export function Protoboard() {
               color={component.color || '#ff0000'}
               onClick={() => handleComponentClick(component.id)}
               isDeleteMode={isDeleteMode}
+              componentId={component.id}
+              circuitState={circuitState}
+              polarity={component.polarity}
             />
           )
         } else if (component.type === 'wire' && component.startPosition && component.endPosition) {
+          const circuitState = circuitSimulation?.components[component.id]
           return (
             <Wire3D
               key={component.id}
@@ -237,6 +250,8 @@ export function Protoboard() {
               color={component.color || '#000000'}
               onClick={() => handleComponentClick(component.id)}
               isDeleteMode={isDeleteMode}
+              current={circuitState?.current || 0}
+              showCurrentFlow={circuitSimulation?.isComplete || false}
             />
           )
         }

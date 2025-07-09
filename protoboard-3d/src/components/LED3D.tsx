@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useState, useRef } from 'react'
 import * as THREE from 'three'
+import { useComponents } from '@/contexts/ComponentContext'
 
 interface LED3DProps {
   position: [number, number, number]
@@ -9,6 +10,13 @@ interface LED3DProps {
   color: string
   onClick?: () => void
   isDeleteMode?: boolean
+  componentId?: string
+  circuitState?: {
+    isOn: boolean
+    isBurned: boolean
+    current: number
+  }
+  polarity?: 'normal' | 'reversed'
 }
 
 // Global LED state
@@ -19,7 +27,12 @@ const ledBurnCallbacks: Set<() => void> = new Set()
 
 // Console commands to control LED
 if (typeof window !== 'undefined') {
-  (window as any).toggleLED = () => {
+  (window as typeof window & {
+    toggleLED: () => void
+    setLED: (state: boolean) => void
+    burnLED: () => void
+    repairLED: () => void
+  }).toggleLED = () => {
     if (!globalLEDBurnedState) {
       globalLEDState = !globalLEDState
       console.log(`LED turned ${globalLEDState ? 'ON' : 'OFF'}`)
@@ -29,7 +42,9 @@ if (typeof window !== 'undefined') {
     }
   }
   
-  (window as any).setLED = (state: boolean) => {
+  (window as typeof window & {
+    setLED: (state: boolean) => void
+  }).setLED = (state: boolean) => {
     if (!globalLEDBurnedState || !state) {
       globalLEDState = state
       console.log(`LED turned ${globalLEDState ? 'ON' : 'OFF'}`)
@@ -39,7 +54,9 @@ if (typeof window !== 'undefined') {
     }
   }
   
-  (window as any).burnLED = () => {
+  (window as typeof window & {
+    burnLED: () => void
+  }).burnLED = () => {
     globalLEDBurnedState = true
     globalLEDState = false
     console.log('💥 LED BURNED OUT! Smoke particles activated.')
@@ -47,7 +64,9 @@ if (typeof window !== 'undefined') {
     ledStateCallbacks.forEach(callback => callback())
   }
   
-  (window as any).repairLED = () => {
+  (window as typeof window & {
+    repairLED: () => void
+  }).repairLED = () => {
     globalLEDBurnedState = false
     console.log('🔧 LED repaired and ready to use!')
     ledBurnCallbacks.forEach(callback => callback())
@@ -56,7 +75,6 @@ if (typeof window !== 'undefined') {
 
 // Smoke Particle Component
 function SmokeParticles({ position }: { position: [number, number, number] }) {
-  const smokeRef = useRef<THREE.Group>(null)
   const particlesRef = useRef<THREE.Points>(null)
   
   useEffect(() => {
@@ -128,13 +146,52 @@ function SmokeParticles({ position }: { position: [number, number, number] }) {
 }
 
 const LED3D = forwardRef<THREE.Group, LED3DProps>(
-  ({ position, endPosition, color, onClick, isDeleteMode }, ref) => {
-    const [isOn, setIsOn] = useState(globalLEDState)
-    const [isBurned, setIsBurned] = useState(globalLEDBurnedState)
+  ({ position, endPosition, color, onClick, isDeleteMode, componentId, circuitState, polarity = 'normal' }, ref) => {
+    const { ledStates, isCircuitRunning } = useComponents()
     
+    // Get individual LED state from context, fallback to global state for backward compatibility
+    const individualLEDState = componentId ? ledStates.get(componentId) : null
+    const [isOn, setIsOn] = useState(individualLEDState?.isOn || circuitState?.isOn || globalLEDState)
+    const [isBurned, setIsBurned] = useState(individualLEDState?.isBurned || circuitState?.isBurned || globalLEDBurnedState)
+    
+    // Update state when individual LED state changes
     useEffect(() => {
-      const stateCallback = () => setIsOn(globalLEDState)
-      const burnCallback = () => setIsBurned(globalLEDBurnedState)
+      if (individualLEDState) {
+        setIsOn(individualLEDState.isOn)
+        setIsBurned(individualLEDState.isBurned)
+      } else if (circuitState) {
+        setIsOn(circuitState.isOn)
+        setIsBurned(circuitState.isBurned)
+      }
+    }, [individualLEDState, circuitState])
+
+    // Reset LED state when circuit stops
+    useEffect(() => {
+      if (!isCircuitRunning) {
+        setIsOn(false)
+        setIsBurned(false)
+      }
+    }, [isCircuitRunning])
+
+    useEffect(() => {
+      const stateCallback = () => {
+        if (!isCircuitRunning) {
+          setIsOn(false)
+        } else if (individualLEDState) {
+          setIsOn(individualLEDState.isOn)
+        } else {
+          setIsOn(globalLEDState)
+        }
+      }
+      const burnCallback = () => {
+        if (!isCircuitRunning) {
+          setIsBurned(false)
+        } else if (individualLEDState) {
+          setIsBurned(individualLEDState.isBurned)
+        } else {
+          setIsBurned(globalLEDBurnedState)
+        }
+      }
       
       ledStateCallbacks.add(stateCallback)
       ledBurnCallbacks.add(burnCallback)
@@ -143,7 +200,7 @@ const LED3D = forwardRef<THREE.Group, LED3DProps>(
         ledStateCallbacks.delete(stateCallback)
         ledBurnCallbacks.delete(burnCallback)
       }
-    }, [])
+    }, [individualLEDState, isCircuitRunning])
 
     // Calculate direction and length between two pins (always 2 pins apart)
     const dx = endPosition[0] - position[0]
@@ -158,7 +215,15 @@ const LED3D = forwardRef<THREE.Group, LED3DProps>(
     ]
 
     return (
-      <group ref={ref} position={midPoint} rotation={[0, -angle, 0]} onClick={onClick}>
+      <group 
+        ref={ref} 
+        position={midPoint} 
+        rotation={[0, -angle, 0]} 
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick?.()
+        }}
+      >
         {/* LED body - dome shape - bigger */}
         <mesh position={[0, 0.08, 0]} castShadow receiveShadow>
           <sphereGeometry args={[0.15, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
@@ -190,16 +255,51 @@ const LED3D = forwardRef<THREE.Group, LED3DProps>(
           />
         </mesh>
         
-        {/* Left pin (cathode - shorter) */}
+        {/* Left pin (cathode - shorter, negative) */}
         <mesh position={[0, -0.08, length / 2]} castShadow>
-          <cylinderGeometry args={[0.015, 0.015, 0.08]} />
+          <cylinderGeometry args={[0.015, 0.015, polarity === 'reversed' ? 0.10 : 0.06]} />
           <meshStandardMaterial color="#C0C0C0" />
         </mesh>
         
-        {/* Right pin (anode - longer) */}
+        {/* Right pin (anode - longer, positive) */}
         <mesh position={[0, -0.08, -length / 2]} castShadow>
-          <cylinderGeometry args={[0.015, 0.015, 0.08]} />
+          <cylinderGeometry args={[0.015, 0.015, polarity === 'reversed' ? 0.06 : 0.10]} />
           <meshStandardMaterial color="#C0C0C0" />
+        </mesh>
+        
+        {/* Polarity indicators */}
+        {/* Flat side on cathode (negative) */}
+        <mesh position={[0, 0.08, length / 2 - 0.05]} castShadow>
+          <boxGeometry args={[0.3, 0.02, 0.02]} />
+          <meshStandardMaterial color="#333333" />
+        </mesh>
+        
+        {/* Minus symbol on cathode (negative side) */}
+        <mesh position={[0, 0.12, length / 2]} rotation={[0, 0, 0]}>
+          <boxGeometry args={[0.08, 0.015, 0.005]} />
+          <meshStandardMaterial color={isDeleteMode ? "#ff0000" : "#ffffff"} />
+        </mesh>
+        
+        {/* Plus symbol on anode (positive side) - horizontal */}
+        <mesh position={[0, 0.12, -length / 2]} rotation={[0, 0, 0]}>
+          <boxGeometry args={[0.08, 0.015, 0.005]} />
+          <meshStandardMaterial color={isDeleteMode ? "#ff0000" : "#ffffff"} />
+        </mesh>
+        {/* Plus symbol on anode (positive side) - vertical */}
+        <mesh position={[0, 0.12, -length / 2]} rotation={[0, 0, Math.PI / 2]}>
+          <boxGeometry args={[0.08, 0.015, 0.005]} />
+          <meshStandardMaterial color={isDeleteMode ? "#ff0000" : "#ffffff"} />
+        </mesh>
+        
+        {/* Colored rings for easy identification */}
+        <mesh position={[0, 0.05, length / 2]} castShadow>
+          <torusGeometry args={[0.18, 0.02, 8, 16]} />
+          <meshStandardMaterial color={isDeleteMode ? "#ff4444" : "#ff0000"} /> {/* Red for negative */}
+        </mesh>
+        
+        <mesh position={[0, 0.05, -length / 2]} castShadow>
+          <torusGeometry args={[0.18, 0.02, 8, 16]} />
+          <meshStandardMaterial color={isDeleteMode ? "#ff4444" : "#00ff00"} /> {/* Green for positive */}
         </mesh>
         
         {/* Light effect when LED is on */}

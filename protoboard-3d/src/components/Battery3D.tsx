@@ -2,6 +2,7 @@
 
 import { forwardRef, useState } from 'react'
 import { ThreeEvent } from '@react-three/fiber'
+import * as THREE from 'three'
 
 interface Battery3DProps {
   position: [number, number, number]
@@ -74,6 +75,22 @@ const Battery3D = forwardRef<THREE.Group, Battery3DProps>(
         <mesh position={[-0.15, 1.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[0.1, 0.1]} />
           <meshStandardMaterial color="#000000" />
+        </mesh>
+        
+        {/* Plus sign on positive terminal */}
+        <mesh position={[0.15, 1.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.06, 0.01]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[0.15, 1.08, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+          <planeGeometry args={[0.06, 0.01]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        
+        {/* Minus sign on negative terminal */}
+        <mesh position={[-0.15, 1.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.06, 0.01]} />
+          <meshStandardMaterial color="#ffffff" />
         </mesh>
         
         {/* Base */}

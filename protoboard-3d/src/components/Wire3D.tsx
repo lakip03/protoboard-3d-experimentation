@@ -2,6 +2,7 @@
 
 import { forwardRef, useMemo } from 'react'
 import { CatmullRomCurve3, Vector3 } from 'three'
+import * as THREE from 'three'
 
 interface Wire3DProps {
   startPosition: [number, number, number]
@@ -9,10 +10,12 @@ interface Wire3DProps {
   color: string
   onClick?: () => void
   isDeleteMode?: boolean
+  current?: number
+  showCurrentFlow?: boolean
 }
 
 const Wire3D = forwardRef<THREE.Group, Wire3DProps>(
-  ({ startPosition, endPosition, color, onClick, isDeleteMode }, ref) => {
+  ({ startPosition, endPosition, color, onClick, isDeleteMode, current = 0, showCurrentFlow = false }, ref) => {
     const curve = useMemo(() => {
       const start = new Vector3(...startPosition)
       const end = new Vector3(...endPosition)
@@ -25,14 +28,23 @@ const Wire3D = forwardRef<THREE.Group, Wire3DProps>(
       return new CatmullRomCurve3([start, mid, end])
     }, [startPosition, endPosition])
 
-    const points = useMemo(() => curve.getPoints(20), [curve])
 
     return (
-      <group ref={ref} onClick={onClick}>
+      <group 
+        ref={ref} 
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick?.()
+        }}
+      >
         {/* Wire body using tube geometry */}
         <mesh castShadow receiveShadow>
           <tubeGeometry args={[curve, 20, 0.02, 8, false]} />
-          <meshStandardMaterial color={isDeleteMode ? "#ff4444" : color} />
+          <meshStandardMaterial 
+            color={isDeleteMode ? "#ff4444" : color}
+            emissive={showCurrentFlow && current > 0.001 ? "#ffff00" : "#000000"}
+            emissiveIntensity={showCurrentFlow && current > 0.001 ? 0.2 : 0}
+          />
         </mesh>
         
         {/* Start connector - lower and shorter */}
