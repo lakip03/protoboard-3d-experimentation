@@ -131,21 +131,6 @@ export default function SideMenu() {
                 </div>
               )}
               
-              {/* LED Status */}
-              {isCircuitRunning && ledStates.size > 0 && (
-                <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <p className="text-sm font-medium text-yellow-700 mb-2">💡 LED Status:</p>
-                  {Array.from(ledStates.entries()).map(([id, state]) => (
-                    <div key={id} className="text-xs text-yellow-600">
-                      LED {id.slice(-4)}: {
-                        state.isBurned ? '💥 BURNED' : 
-                        state.isOn ? '✅ ON' : 
-                        '⚫ OFF'
-                      } ({(state.current * 1000).toFixed(1)}mA)
-                    </div>
-                  ))}
-                </div>
-              )}
               
               {/* Reset Info */}
               {!isCircuitRunning && ledStates.size > 0 && (

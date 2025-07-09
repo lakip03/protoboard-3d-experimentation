@@ -222,6 +222,8 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
   }
 
   const exportConfiguration = () => {
+    const fileName = prompt('Enter a name for your circuit:', 'my-circuit') || 'my-circuit'
+    
     const config = {
       placedComponents,
       ledStates: Array.from(ledStates.entries()),
@@ -231,7 +233,7 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
     const dataStr = JSON.stringify(config, null, 2)
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
     
-    const exportFileDefaultName = `protoboard-config-${new Date().toISOString().slice(0, 10)}.json`
+    const exportFileDefaultName = `${fileName}.json`
     
     const linkElement = document.createElement('a')
     linkElement.setAttribute('href', dataUri)
