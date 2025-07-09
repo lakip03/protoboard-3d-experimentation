@@ -568,8 +568,8 @@ export class CircuitSimulator {
           // LED is on ONLY if it has a complete path AND current is sufficient
           isOn = hasCompleteLEDPath && current > 0.001 && actualVoltage >= forwardVoltage
           
-          // LED burns if current exceeds safe threshold (30mA for typical LEDs)
-          isBurned = current > 0.030
+          // LED burns ONLY if it has a complete path AND current exceeds safe threshold (30mA for typical LEDs)
+          isBurned = hasCompleteLEDPath && current > 0.030
           
           // Check for reverse polarity (high voltage but no current)
           const isReverseBiased = actualVoltage > 3.0 && current < 0.001
