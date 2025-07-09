@@ -60,6 +60,9 @@ interface ComponentContextType {
   ledStates: Map<string, LEDState>
   updateLEDState: (componentId: string, state: LEDState) => void
   resetAllLEDs: () => void
+  exportConfiguration: () => void
+  importConfiguration: (file: File) => void
+  clearAll: () => void
 }
 
 const ComponentContext = createContext<ComponentContextType | undefined>(undefined)
@@ -173,6 +176,89 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const exportConfiguration = () => {
+    const config = {
+      placedComponents,
+      ledStates: Array.from(ledStates.entries()),
+      timestamp: new Date().toISOString()
+    }
+    
+    const dataStr = JSON.stringify(config, null, 2)
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
+    
+    const exportFileDefaultName = `protoboard-config-${new Date().toISOString().slice(0, 10)}.json`
+    
+    const linkElement = document.createElement('a')
+    linkElement.setAttribute('href', dataUri)
+    linkElement.setAttribute('download', exportFileDefaultName)
+    linkElement.click()
+  }
+
+  const importConfiguration = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const config = JSON.parse(e.target?.result as string)
+        
+        if (config.placedComponents && Array.isArray(config.placedComponents)) {
+          // Stop circuit if running
+          setIsCircuitRunning(false)
+          setCircuitSimulation(null)
+          
+          // Load components
+          setPlacedComponents(config.placedComponents)
+          
+          // Load LED states if available
+          if (config.ledStates && Array.isArray(config.ledStates)) {
+            const newLedStates = new Map(config.ledStates)
+            setLedStates(newLedStates)
+          } else {
+            // Initialize LED states for imported LEDs
+            const newLedStates = new Map()
+            config.placedComponents.forEach((component: PlacedComponent) => {
+              if (component.type === 'led') {
+                newLedStates.set(component.id, {
+                  isOn: false,
+                  isBurned: false,
+                  current: 0,
+                  voltage: 0
+                })
+              }
+            })
+            setLedStates(newLedStates)
+          }
+          
+          alert('Configuration imported successfully!')
+        } else {
+          alert('Invalid configuration file format')
+        }
+      } catch (error) {
+        alert('Error reading configuration file')
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const clearAll = () => {
+    if (placedComponents.length > 0) {
+      const confirmClear = confirm('Are you sure you want to clear all components from the protoboard?')
+      if (confirmClear) {
+        setPlacedComponents([])
+        setLedStates(new Map())
+        setIsCircuitRunning(false)
+        setCircuitSimulation(null)
+        setSelectedComponent(null)
+        setIsDeleteMode(false)
+        setIsPlacingWire(false)
+        setWireStartPosition(null)
+        setIsPlacingResistor(false)
+        setResistorStartPosition(null)
+        setIsPlacingLED(false)
+        setLEDStartPosition(null)
+      }
+    }
+  }
+
   return (
     <ComponentContext.Provider value={{
       placedComponents,
@@ -202,7 +288,10 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
       setIsCircuitRunning,
       ledStates,
       updateLEDState,
-      resetAllLEDs
+      resetAllLEDs,
+      exportConfiguration,
+      importConfiguration,
+      clearAll
     }}>
       {children}
     </ComponentContext.Provider>

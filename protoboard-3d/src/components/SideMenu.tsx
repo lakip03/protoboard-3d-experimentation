@@ -45,7 +45,10 @@ export default function SideMenu() {
     showInstructions,
     setShowInstructions,
     isCircuitRunning,
-    ledStates
+    ledStates,
+    exportConfiguration,
+    importConfiguration,
+    clearAll
   } = useComponents()
 
   const handleComponentClick = (component: Component) => {
@@ -56,6 +59,19 @@ export default function SideMenu() {
   const handleDeleteModeToggle = () => {
     setIsDeleteMode(!isDeleteMode)
     setSelectedComponent(null)
+  }
+
+  const handleImport = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        importConfiguration(file)
+      }
+    }
+    input.click()
   }
 
   return (
@@ -176,6 +192,49 @@ export default function SideMenu() {
                   {placedComponents.length} component{placedComponents.length !== 1 ? 's' : ''} on board
                 </p>
               )}
+            </div>
+
+            {/* Import/Export/Clear Buttons */}
+            <div className="mb-6 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={exportConfiguration}
+                  disabled={placedComponents.length === 0}
+                  className={`p-3 rounded-xl border-2 text-center transition-all duration-200 transform hover:scale-105 ${
+                    placedComponents.length === 0
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'border-green-500 bg-green-100 hover:bg-green-200 text-green-800'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    <div className="text-xl">📤</div>
+                    <div className="font-bold text-sm">Export</div>
+                  </div>
+                </button>
+                <button
+                  onClick={handleImport}
+                  className="p-3 rounded-xl border-2 text-center transition-all duration-200 transform hover:scale-105 border-blue-500 bg-blue-100 hover:bg-blue-200 text-blue-800"
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    <div className="text-xl">📥</div>
+                    <div className="font-bold text-sm">Import</div>
+                  </div>
+                </button>
+              </div>
+              <button
+                onClick={clearAll}
+                disabled={placedComponents.length === 0}
+                className={`w-full p-3 rounded-xl border-2 text-center transition-all duration-200 transform hover:scale-105 ${
+                  placedComponents.length === 0
+                    ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'border-orange-500 bg-orange-100 hover:bg-orange-200 text-orange-800'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="text-xl">🧹</div>
+                  <div className="font-bold text-sm">Clear All</div>
+                </div>
+              </button>
             </div>
 
           {/* Instructions Panel */}
