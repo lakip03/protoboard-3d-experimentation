@@ -554,11 +554,19 @@ export class CircuitSimulator {
         if (component.type === 'led') {
           const forwardVoltage = component.forwardVoltage || 2.0
           
+          // Check if this specific LED has a complete path to both battery terminals
+          const hasPathToPositive = this.isConnectedToBattery(component.startNode, 'positive') || 
+                                   this.isConnectedToBattery(component.endNode, 'positive')
+          const hasPathToNegative = this.isConnectedToBattery(component.startNode, 'negative') || 
+                                   this.isConnectedToBattery(component.endNode, 'negative')
+          
+          const hasCompleteLEDPath = hasPathToPositive && hasPathToNegative
+          
           // For LEDs, use forced voltage for display and logic
           const actualVoltage = this.batteryVoltage
           
-          // LED is on if current is sufficient and voltage exceeds forward voltage
-          isOn = current > 0.001 && actualVoltage >= forwardVoltage
+          // LED is on ONLY if it has a complete path AND current is sufficient
+          isOn = hasCompleteLEDPath && current > 0.001 && actualVoltage >= forwardVoltage
           
           // LED burns if current exceeds safe threshold (30mA for typical LEDs)
           isBurned = current > 0.030
