@@ -1,12 +1,13 @@
 export interface PlacedComponent {
   id: string
-  type: 'wire' | 'resistor' | 'led'
+  type: 'wire' | 'resistor' | 'led' | 'switch'
   position: [number, number, number]
   color?: string
   value?: string
   startPosition?: [number, number, number]
   endPosition?: [number, number, number]
   polarity?: 'normal' | 'reversed'
+  isOn?: boolean
 }
 
 export interface CircuitNode {
@@ -19,7 +20,7 @@ export interface CircuitNode {
 
 export interface CircuitComponent {
   id: string
-  type: 'wire' | 'resistor' | 'led' | 'battery'
+  type: 'wire' | 'resistor' | 'led' | 'battery' | 'switch'
   startNode: string
   endNode: string
   resistance?: number
@@ -58,6 +59,7 @@ export class CircuitSimulator {
   private nodes: Map<string, CircuitNode> = new Map()
   private components: Map<string, CircuitComponent> = new Map()
   private batteryVoltage = 9
+  private switchStates: Map<string, boolean> = new Map()
 
   constructor() {
     this.initializeBatteryNodes()
@@ -120,6 +122,7 @@ export class CircuitSimulator {
   loadCircuit(placedComponents: PlacedComponent[]): void {
     this.nodes.clear()
     this.components.clear()
+    this.switchStates.clear()
     this.initializeBatteryNodes()
 
     placedComponents.forEach(component => {
@@ -172,6 +175,32 @@ export class CircuitSimulator {
           forwardVoltage: this.getLEDForwardVoltage(component.color || '#ff0000'),
           color: component.color
         })
+      } else if (component.type === 'switch' && component.position && component.endPosition) {
+        // Switch controls circuit flow between two positions
+        const startNode = this.getOrCreateNode(component.position)
+        const endNode = this.getOrCreateNode(component.endPosition)
+        
+        // Store switch state
+        const switchState = component.isOn || false
+        this.switchStates.set(component.id, switchState)
+        console.log(`Switch ${component.id} loaded with state: ${switchState}`)
+        
+        // When switch is ON, connect the two nodes like a wire
+        if (switchState) {
+          startNode.connections.push(endNode.id)
+          endNode.connections.push(startNode.id)
+          
+          this.components.set(component.id, {
+            id: component.id,
+            type: 'wire', // Act like a wire when ON
+            startNode: startNode.id,
+            endNode: endNode.id,
+            resistance: 0.01,
+            startPosition: component.position,
+            endPosition: component.endPosition
+          })
+        }
+        // When switch is OFF, don't add any connections
       }
     })
 
@@ -270,7 +299,7 @@ export class CircuitSimulator {
   }
 
   private hasDirectShortCircuit(): boolean {
-    // Check if there's a path from battery positive to battery negative that goes only through wires
+    // Check if there's a path from battery positive to battery negative that goes only through wires and ON switches
     // (no resistors or LEDs to limit current)
     
     // Get all components that form a path from positive to negative
@@ -278,10 +307,12 @@ export class CircuitSimulator {
     
     if (pathComponents.length === 0) return false
     
-    // Check if the path contains only wires (no resistors or LEDs)
-    const hasOnlyWires = pathComponents.every(component => component.type === 'wire')
+    // Check if the path contains only wires and ON switches (no resistors or LEDs)
+    const hasOnlyWiresAndSwitches = pathComponents.every(component => 
+      component.type === 'wire' || (component.type === 'switch' && this.isSwitchOn(component.id))
+    )
     
-    return hasOnlyWires
+    return hasOnlyWiresAndSwitches
   }
 
   private findPathComponents(startNodeId: string, endNodeId: string): CircuitComponent[] {
@@ -300,6 +331,11 @@ export class CircuitSimulator {
       
       // Check all components connected to this node
       for (const [, component] of this.components) {
+        // Skip OFF switches - they don't allow current flow
+        if (component.type === 'switch' && !this.isSwitchOn(component.id)) {
+          continue
+        }
+        
         let connectedNodeId: string | null = null
         
         if (component.startNode === nodeId) {
@@ -389,6 +425,68 @@ export class CircuitSimulator {
     }
   }
 
+  private isSwitchOn(switchId: string): boolean {
+    const isOn = this.switchStates.get(switchId) || false
+    console.log(`Checking switch ${switchId} state: ${isOn}`)
+    return isOn
+  }
+
+  private hasCompleteCircuitPath(startNodeId: string, endNodeId: string): boolean {
+    // Check if there's a complete circuit path from battery positive to battery negative
+    // that goes through both LED nodes, considering switch states
+    
+    const positiveToBatteryPath = this.isConnectedToBatteryThroughSwitches(startNodeId, 'positive')
+    const negativeToBatteryPath = this.isConnectedToBatteryThroughSwitches(endNodeId, 'negative')
+    
+    const result = positiveToBatteryPath && negativeToBatteryPath
+    console.log(`Complete circuit path for LED (${startNodeId} -> ${endNodeId}): ${result}`)
+    return result
+  }
+
+  private isConnectedToBatteryThroughSwitches(nodeId: string, terminal: 'positive' | 'negative'): boolean {
+    const terminalId = terminal === 'positive' ? 'battery-positive' : 'battery-negative'
+    const visited = new Set<string>()
+    const queue = [nodeId]
+    
+    while (queue.length > 0) {
+      const currentNodeId = queue.shift()!
+      
+      if (visited.has(currentNodeId)) continue
+      visited.add(currentNodeId)
+      
+      if (currentNodeId === terminalId) return true
+      
+      const node = this.nodes.get(currentNodeId)
+      if (!node) continue
+      
+      // Check direct connections
+      for (const connectedNodeId of node.connections) {
+        if (!visited.has(connectedNodeId)) {
+          queue.push(connectedNodeId)
+        }
+      }
+      
+      // Check wire connections AND switch connections (only if switch is ON)
+      for (const [, component] of this.components) {
+        if (component.type === 'wire' || (component.type === 'switch' && this.isSwitchOn(component.id))) {
+          let connectedNodeId: string | null = null
+          
+          if (component.startNode === currentNodeId) {
+            connectedNodeId = component.endNode
+          } else if (component.endNode === currentNodeId) {
+            connectedNodeId = component.startNode
+          }
+          
+          if (connectedNodeId && !visited.has(connectedNodeId)) {
+            queue.push(connectedNodeId)
+          }
+        }
+      }
+    }
+    
+    return false
+  }
+
 
   private calculateCurrent(component: CircuitComponent): number {
     if (component.type === 'led') {
@@ -442,11 +540,13 @@ export class CircuitSimulator {
     for (const [, component] of this.components) {
       if (component.type === 'wire') {
         if (component.startNode === nodeId || component.endNode === nodeId) {
+          console.log(`Node ${nodeId} has wire connection via component ${component.id}`)
           return true
         }
       }
     }
     
+    console.log(`Node ${nodeId} has NO wire connections`)
     return false
   }
 
@@ -473,7 +573,7 @@ export class CircuitSimulator {
         }
       }
       
-      // Check wire connections
+      // Check wire connections only
       for (const [, component] of this.components) {
         if (component.type === 'wire') {
           let connectedNodeId: string | null = null
@@ -504,6 +604,11 @@ export class CircuitSimulator {
       warnings: []
     }
 
+    // SIMPLE CHECK: If any switch is OFF, circuit is broken
+    const hasOffSwitch = Array.from(this.switchStates.entries()).some(([id, isOn]) => !isOn)
+    console.log('Switch states:', Array.from(this.switchStates.entries()))
+    console.log('Has OFF switch:', hasOffSwitch)
+
     this.calculateNodeVoltages()
 
     const positiveConnected = this.findConnectedNodes('battery-positive')
@@ -514,7 +619,7 @@ export class CircuitSimulator {
     // Check for short circuit - direct wire connection between battery terminals
     const hasShortCircuit = this.hasDirectShortCircuit()
     
-    result.isComplete = hasCompletePath && !hasShortCircuit
+    result.isComplete = hasCompletePath && !hasShortCircuit && !hasOffSwitch
     result.hasShortCircuit = hasShortCircuit
 
     // Debug logging
@@ -580,11 +685,12 @@ export class CircuitSimulator {
           // For LEDs, use forced voltage for display and logic
           const actualVoltage = this.batteryVoltage
           
-          // LED is on ONLY if it has a complete path AND current is sufficient
-          isOn = hasCompleteLEDPath && current > 0.001 && actualVoltage >= forwardVoltage
+          // SIMPLE: LED is on ONLY if circuit is complete AND no switches are off
+          isOn = hasCompleteLEDPath && result.isComplete && current > 0.001 && actualVoltage >= forwardVoltage
+          console.log(`LED ${component.id} logic: hasCompleteLEDPath=${hasCompleteLEDPath}, result.isComplete=${result.isComplete}, current=${current}, isOn=${isOn}`)
           
           // LED burns ONLY if it has a complete path AND current exceeds safe threshold (30mA for typical LEDs)
-          isBurned = hasCompleteLEDPath && current > 0.030
+          isBurned = hasCompleteLEDPath && result.isComplete && current > 0.030
           
           // Check for reverse polarity (high voltage but no current)
           const isReverseBiased = actualVoltage > 3.0 && current < 0.001

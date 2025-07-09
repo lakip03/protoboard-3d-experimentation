@@ -6,7 +6,7 @@ import { useComponents } from '@/contexts/ComponentContext'
 interface Component {
   id: string
   name: string
-  type: 'resistor' | 'wire' | 'led'
+  type: 'resistor' | 'wire' | 'led' | 'switch'
   color?: string
   value?: string
   emoji?: string
@@ -27,6 +27,7 @@ const components: Component[] = [
   { id: '12', name: 'Green Wire', type: 'wire', color: '#00ff00', emoji: '🟢' },
   { id: '13', name: 'Yellow Wire', type: 'wire', color: '#ffff00', emoji: '🟡' },
   { id: '14', name: 'Black Wire', type: 'wire', color: '#000000', emoji: '⚫' },
+  { id: '15', name: 'Switch', type: 'switch', color: '#2a2a2a', emoji: '🔘' },
 ]
 
 export default function SideMenu() {
@@ -37,6 +38,7 @@ export default function SideMenu() {
     isPlacingWire, 
     isPlacingResistor,
     isPlacingLED,
+    isPlacingSwitch,
     isDeleteMode,
     setIsDeleteMode,
     placedComponents,
@@ -332,6 +334,34 @@ export default function SideMenu() {
           </div>
 
           <div>
+            <h3 className="text-xl font-bold text-purple-700 mb-4 flex items-center gap-2">
+              🔘 Switches
+            </h3>
+            <div className="space-y-3">
+              {components.filter(c => c.type === 'switch').map((component) => (
+                <button
+                  key={component.id}
+                  onClick={() => handleComponentClick(component)}
+                  className={`w-full p-4 rounded-xl border-3 text-left transition-all duration-200 transform hover:scale-105 ${
+                    selectedComponent?.id === component.id
+                      ? 'border-purple-500 bg-purple-100 shadow-lg'
+                      : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50 bg-white'
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="text-2xl">{component.emoji}</div>
+                    <div 
+                      className="w-6 h-6 rounded-sm shadow-sm"
+                      style={{ backgroundColor: component.color }}
+                    />
+                    <div className="font-bold text-gray-800 text-lg">{component.name}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <h3 className="text-xl font-bold text-red-700 mb-4 flex items-center gap-2">
               🔌 Wires
             </h3>
@@ -389,10 +419,14 @@ export default function SideMenu() {
                       ? '🎯 Click exactly 2 holes away to finish the resistor!'
                       : selectedComponent.type === 'led' && isPlacingLED
                       ? '🎯 Click exactly 1 hole away to finish the LED!'
+                      : selectedComponent.type === 'switch' && isPlacingSwitch
+                      ? '🎯 Click on any hole to place the switch!'
                       : selectedComponent.type === 'resistor'
                       ? '🎯 Click on two holes that are 2 spaces apart!'
                       : selectedComponent.type === 'led'
                       ? '🎯 Click on two holes that are 1 space apart!'
+                      : selectedComponent.type === 'switch'
+                      ? '🎯 Click on any hole to place the switch!'
                       : '🎯 Click on any hole in the protoboard to place it!'}
                   </p>
                 </div>

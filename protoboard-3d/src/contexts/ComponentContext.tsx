@@ -12,7 +12,7 @@ interface LEDState {
 
 interface PlacedComponent {
   id: string
-  type: 'wire' | 'resistor' | 'led'
+  type: 'wire' | 'resistor' | 'led' | 'switch'
   position: [number, number, number]
   rotation?: [number, number, number]
   color?: string
@@ -20,12 +20,13 @@ interface PlacedComponent {
   startPosition?: [number, number, number]
   endPosition?: [number, number, number]
   polarity?: 'normal' | 'reversed'
+  isOn?: boolean
 }
 
 interface SelectedComponent {
   id: string
   name: string
-  type: 'resistor' | 'wire' | 'led'
+  type: 'resistor' | 'wire' | 'led' | 'switch'
   color?: string
   value?: string
   emoji?: string
@@ -49,6 +50,8 @@ interface ComponentContextType {
   setIsPlacingLED: (placing: boolean) => void
   ledStartPosition: [number, number, number] | null
   setLEDStartPosition: (position: [number, number, number] | null) => void
+  isPlacingSwitch: boolean
+  setIsPlacingSwitch: (placing: boolean) => void
   isDeleteMode: boolean
   setIsDeleteMode: (deleteMode: boolean) => void
   circuitSimulation: CircuitSimulationResult | null
@@ -60,6 +63,7 @@ interface ComponentContextType {
   ledStates: Map<string, LEDState>
   updateLEDState: (componentId: string, state: LEDState) => void
   resetAllLEDs: () => void
+  updateSwitchState: (componentId: string, isOn: boolean) => void
   exportConfiguration: () => void
   importConfiguration: (file: File) => void
   clearAll: () => void
@@ -76,12 +80,15 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
   const [resistorStartPosition, setResistorStartPosition] = useState<[number, number, number] | null>(null)
   const [isPlacingLED, setIsPlacingLED] = useState(false)
   const [ledStartPosition, setLEDStartPosition] = useState<[number, number, number] | null>(null)
+  const [isPlacingSwitch, setIsPlacingSwitch] = useState(false)
   const [isDeleteMode, setIsDeleteMode] = useState(false)
   const [circuitSimulation, setCircuitSimulation] = useState<CircuitSimulationResult | null>(null)
   const [showInstructions, setShowInstructions] = useState(false)
   const [isCircuitRunning, setIsCircuitRunning] = useState(false)
   const [ledStates, setLedStates] = useState<Map<string, LEDState>>(new Map())
   const [simulator] = useState(() => new CircuitSimulator())
+
+
 
   const addComponent = (component: PlacedComponent) => {
     setPlacedComponents(prev => [...prev, component])
@@ -136,6 +143,44 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
       })
       return newStates
     })
+  }
+
+  const updateSwitchState = (componentId: string, isOn: boolean) => {
+    console.log(`Switch ${componentId} toggled to: ${isOn}`)
+    
+    // Update components state
+    const updatedComponents = placedComponents.map(comp => 
+      comp.id === componentId ? { ...comp, isOn } : comp
+    )
+    setPlacedComponents(updatedComponents)
+    
+    // Immediately rerun simulation if circuit is running
+    if (isCircuitRunning) {
+      console.log('Circuit is running, updating simulation...')
+      console.log('Updated components:', updatedComponents)
+      
+      setTimeout(() => {
+        simulator.loadCircuit(updatedComponents)
+        const result = simulator.simulate()
+        setCircuitSimulation(result)
+        
+        // Update LED states
+        updatedComponents.forEach(component => {
+          if (component.type === 'led') {
+            const circuitState = result.components[component.id]
+            if (circuitState) {
+              console.log(`Updating LED ${component.id} to:`, circuitState)
+              updateLEDState(component.id, {
+                isOn: circuitState.isOn,
+                isBurned: circuitState.isBurned,
+                current: circuitState.current,
+                voltage: circuitState.voltage
+              })
+            }
+          }
+        })
+      }, 10)
+    }
   }
 
   const runCircuitSimulation = () => {
@@ -255,6 +300,7 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
         setResistorStartPosition(null)
         setIsPlacingLED(false)
         setLEDStartPosition(null)
+        setIsPlacingSwitch(false)
       }
     }
   }
@@ -278,6 +324,8 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
       setIsPlacingLED,
       ledStartPosition,
       setLEDStartPosition,
+      isPlacingSwitch,
+      setIsPlacingSwitch,
       isDeleteMode,
       setIsDeleteMode,
       circuitSimulation,
@@ -289,6 +337,7 @@ export function ComponentProvider({ children }: { children: ReactNode }) {
       ledStates,
       updateLEDState,
       resetAllLEDs,
+      updateSwitchState,
       exportConfiguration,
       importConfiguration,
       clearAll
