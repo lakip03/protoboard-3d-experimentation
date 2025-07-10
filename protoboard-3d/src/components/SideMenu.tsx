@@ -6,7 +6,7 @@ import { useComponents } from '@/contexts/ComponentContext'
 interface Component {
   id: string
   name: string
-  type: 'resistor' | 'wire' | 'led'
+  type: 'resistor' | 'wire' | 'led' | 'switch'
   color?: string
   value?: string
   emoji?: string
@@ -27,6 +27,7 @@ const components: Component[] = [
   { id: '12', name: 'Green Wire', type: 'wire', color: '#00ff00', emoji: '🟢' },
   { id: '13', name: 'Yellow Wire', type: 'wire', color: '#ffff00', emoji: '🟡' },
   { id: '14', name: 'Black Wire', type: 'wire', color: '#000000', emoji: '⚫' },
+  { id: '15', name: 'Switch', type: 'switch', color: '#2a2a2a', emoji: '🔘' },
 ]
 
 export default function SideMenu() {
@@ -37,9 +38,19 @@ export default function SideMenu() {
     isPlacingWire, 
     isPlacingResistor,
     isPlacingLED,
+    isPlacingSwitch,
     isDeleteMode,
     setIsDeleteMode,
-    placedComponents
+    placedComponents,
+    runCircuitSimulation,
+    circuitSimulation,
+    showInstructions,
+    setShowInstructions,
+    isCircuitRunning,
+    ledStates,
+    exportConfiguration,
+    importConfiguration,
+    clearAll
   } = useComponents()
 
   const handleComponentClick = (component: Component) => {
@@ -50,6 +61,19 @@ export default function SideMenu() {
   const handleDeleteModeToggle = () => {
     setIsDeleteMode(!isDeleteMode)
     setSelectedComponent(null)
+  }
+
+  const handleImport = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        importConfiguration(file)
+      }
+    }
+    input.click()
   }
 
   return (
@@ -73,16 +97,61 @@ export default function SideMenu() {
 
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           <div className="space-y-6">
-            {/* Run Circuit Button */}
+            {/* Run/Stop Circuit Button */}
             <div className="mb-6">
               <button
-                onClick={() => {/* TODO: Add circuit simulation */}}
-                className="w-full p-4 rounded-xl border-3 text-center transition-all duration-200 transform hover:scale-105 border-green-500 bg-green-100 hover:bg-green-200 shadow-lg"
+                onClick={runCircuitSimulation}
+                className={`w-full p-4 rounded-xl border-3 text-center transition-all duration-200 transform hover:scale-105 shadow-lg ${
+                  isCircuitRunning 
+                    ? 'border-red-500 bg-red-100 hover:bg-red-200' 
+                    : 'border-green-500 bg-green-100 hover:bg-green-200'
+                }`}
               >
                 <div className="flex items-center justify-center space-x-3">
-                  <div className="text-2xl">⚡</div>
-                  <div className="font-bold text-green-800 text-lg">
-                    Run Circuit
+                  <div className="text-2xl">{isCircuitRunning ? '⏹️' : '⚡'}</div>
+                  <div className={`font-bold text-lg ${
+                    isCircuitRunning ? 'text-red-800' : 'text-green-800'
+                  }`}>
+                    {isCircuitRunning ? 'Stop Circuit' : 'Run Circuit'}
+                  </div>
+                </div>
+              </button>
+              
+              {/* Circuit Status */}
+              {isCircuitRunning && circuitSimulation && (
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm font-medium text-blue-700">
+                    {circuitSimulation.isComplete ? 
+                      "✅ Circuit is working!" : 
+                      "❌ Circuit incomplete"}
+                  </p>
+                  {circuitSimulation.hasShortCircuit && (
+                    <p className="text-xs text-red-600 mt-1">⚠️ Short circuit detected!</p>
+                  )}
+                </div>
+              )}
+              
+              
+              {/* Reset Info */}
+              {!isCircuitRunning && ledStates.size > 0 && (
+                <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm font-medium text-green-700">
+                    🔧 All LEDs have been repaired and reset
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Instructions Button */}
+            <div className="mb-6">
+              <button
+                onClick={() => setShowInstructions(!showInstructions)}
+                className="w-full p-4 rounded-xl border-3 text-center transition-all duration-200 transform hover:scale-105 border-blue-500 bg-blue-100 hover:bg-blue-200 shadow-lg"
+              >
+                <div className="flex items-center justify-center space-x-3">
+                  <div className="text-2xl">📚</div>
+                  <div className="font-bold text-blue-800 text-lg">
+                    {showInstructions ? 'Hide Instructions' : 'Show Instructions'}
                   </div>
                 </div>
               </button>
@@ -111,6 +180,84 @@ export default function SideMenu() {
                 </p>
               )}
             </div>
+
+            {/* Import/Export/Clear Buttons */}
+            <div className="mb-6 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={exportConfiguration}
+                  disabled={placedComponents.length === 0}
+                  className={`p-3 rounded-xl border-2 text-center transition-all duration-200 transform hover:scale-105 ${
+                    placedComponents.length === 0
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'border-green-500 bg-green-100 hover:bg-green-200 text-green-800'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    <div className="text-xl">📤</div>
+                    <div className="font-bold text-sm">Export</div>
+                  </div>
+                </button>
+                <button
+                  onClick={handleImport}
+                  className="p-3 rounded-xl border-2 text-center transition-all duration-200 transform hover:scale-105 border-blue-500 bg-blue-100 hover:bg-blue-200 text-blue-800"
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    <div className="text-xl">📥</div>
+                    <div className="font-bold text-sm">Import</div>
+                  </div>
+                </button>
+              </div>
+              <button
+                onClick={clearAll}
+                disabled={placedComponents.length === 0}
+                className={`w-full p-3 rounded-xl border-2 text-center transition-all duration-200 transform hover:scale-105 ${
+                  placedComponents.length === 0
+                    ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'border-orange-500 bg-orange-100 hover:bg-orange-200 text-orange-800'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="text-xl">🧹</div>
+                  <div className="font-bold text-sm">Clear All</div>
+                </div>
+              </button>
+            </div>
+
+          {/* Instructions Panel */}
+          {showInstructions && (
+            <div className="mb-6 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
+              <h3 className="text-lg font-bold text-purple-800 mb-3 flex items-center gap-2">
+                🎓 How to Build Circuits
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="p-2 bg-white rounded-lg border border-purple-100">
+                  <p className="font-medium text-purple-700">🔋 Step 1: Connect Battery</p>
+                  <p className="text-purple-600">Connect a wire from the RED (+) terminal to start</p>
+                </div>
+                <div className="p-2 bg-white rounded-lg border border-purple-100">
+                  <p className="font-medium text-purple-700">💡 Step 2: Add LED</p>
+                  <p className="text-purple-600">Look for + and - symbols • Green ring = positive • Red ring = negative</p>
+                </div>
+                <div className="p-2 bg-white rounded-lg border border-purple-100">
+                  <p className="font-medium text-purple-700">⚡ Step 3: Add Resistor</p>
+                  <p className="text-purple-600">Use 220Ω resistor to protect your LED from burning!</p>
+                </div>
+                <div className="p-2 bg-white rounded-lg border border-purple-100">
+                  <p className="font-medium text-purple-700">🔌 Step 4: Complete Circuit</p>
+                  <p className="text-purple-600">Connect back to BLACK (-) terminal</p>
+                </div>
+                <div className="p-2 bg-green-50 rounded-lg border border-green-200">
+                  <p className="font-medium text-green-700">✨ Remember:</p>
+                  <p className="text-green-600">LEDs: 1 hole apart • Resistors: 2 holes apart</p>
+                </div>
+                <div className="p-2 bg-purple-50 rounded-lg border border-purple-200">
+                  <p className="font-medium text-purple-700">🔄 Circuit Control:</p>
+                  <p className="text-purple-600">Press &quot;Run Circuit&quot; to start • Press &quot;Stop Circuit&quot; to reset & repair LEDs</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">
@@ -162,6 +309,34 @@ export default function SideMenu() {
                     <div className="text-2xl">{component.emoji}</div>
                     <div 
                       className="w-6 h-6 rounded-full shadow-sm"
+                      style={{ backgroundColor: component.color }}
+                    />
+                    <div className="font-bold text-gray-800 text-lg">{component.name}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-bold text-purple-700 mb-4 flex items-center gap-2">
+              🔘 Switches
+            </h3>
+            <div className="space-y-3">
+              {components.filter(c => c.type === 'switch').map((component) => (
+                <button
+                  key={component.id}
+                  onClick={() => handleComponentClick(component)}
+                  className={`w-full p-4 rounded-xl border-3 text-left transition-all duration-200 transform hover:scale-105 ${
+                    selectedComponent?.id === component.id
+                      ? 'border-purple-500 bg-purple-100 shadow-lg'
+                      : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50 bg-white'
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="text-2xl">{component.emoji}</div>
+                    <div 
+                      className="w-6 h-6 rounded-sm shadow-sm"
                       style={{ backgroundColor: component.color }}
                     />
                     <div className="font-bold text-gray-800 text-lg">{component.name}</div>
@@ -229,10 +404,14 @@ export default function SideMenu() {
                       ? '🎯 Click exactly 2 holes away to finish the resistor!'
                       : selectedComponent.type === 'led' && isPlacingLED
                       ? '🎯 Click exactly 1 hole away to finish the LED!'
+                      : selectedComponent.type === 'switch' && isPlacingSwitch
+                      ? '🎯 Click on any hole to place the switch!'
                       : selectedComponent.type === 'resistor'
                       ? '🎯 Click on two holes that are 2 spaces apart!'
                       : selectedComponent.type === 'led'
                       ? '🎯 Click on two holes that are 1 space apart!'
+                      : selectedComponent.type === 'switch'
+                      ? '🎯 Click on any hole to place the switch!'
                       : '🎯 Click on any hole in the protoboard to place it!'}
                   </p>
                 </div>

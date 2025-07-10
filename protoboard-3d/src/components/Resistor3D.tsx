@@ -27,7 +27,15 @@ const Resistor3D = forwardRef<THREE.Group, Resistor3DProps>(
     ]
 
     return (
-      <group ref={ref} position={midPoint} rotation={[0, -angle, 0]} onClick={onClick}>
+      <group 
+        ref={ref} 
+        position={midPoint} 
+        rotation={[0, -angle, 0]} 
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick?.()
+        }}
+      >
         {/* Horizontal cylinder body - oriented along Z axis, ends align with pins */}
         <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[0.04, 0.04, length]} />

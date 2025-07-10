@@ -5,6 +5,7 @@ import { ThreeEvent } from '@react-three/fiber'
 import Resistor3D from './Resistor3D'
 import Wire3D from './Wire3D'
 import LED3D from './LED3D'
+import Switch3D from './Switch3D'
 import { useState } from 'react'
 
 export function Protoboard() {
@@ -25,7 +26,12 @@ export function Protoboard() {
     setIsPlacingLED,
     ledStartPosition,
     setLEDStartPosition,
-    isDeleteMode
+    isPlacingSwitch,
+    setIsPlacingSwitch,
+    isDeleteMode,
+    circuitSimulation,
+    updateSwitchState,
+    isCircuitRunning
   } = useComponents()
   
   const [hoveredHole, setHoveredHole] = useState<[number, number] | null>(null)
@@ -34,11 +40,16 @@ export function Protoboard() {
     return [-3.6 + (col * 0.3), 0.15, -1.8 + (row * 0.3)]
   }
 
+  const handleSwitchToggle = (componentId: string, isOn: boolean) => {
+    updateSwitchState(componentId, isOn)
+  }
+
   const handleComponentClick = (componentId: string) => {
     if (isDeleteMode) {
       const component = placedComponents.find(c => c.id === componentId)
       const componentType = component?.type === 'resistor' ? 'resistor' : 
-                           component?.type === 'led' ? 'LED' : 'wire'
+                           component?.type === 'led' ? 'LED' : 
+                           component?.type === 'switch' ? 'switch' : 'wire'
       const confirmed = window.confirm(`🗑️ Delete this ${componentType}?`)
       if (confirmed) {
         removeComponent(componentId)
@@ -126,12 +137,19 @@ export function Protoboard() {
           
           if (isValidPlacement) {
             const ledId = Date.now().toString()
+            
+            // Determine polarity based on placement direction
+            // If placed left-to-right or top-to-bottom, it's normal
+            // If placed right-to-left or bottom-to-top, it's reversed
+            const isReversed = (endCol < startCol) || (endRow < startRow)
+            
             addComponent({
               id: ledId,
               type: 'led',
               position: ledStartPosition,
               endPosition: position,
-              color: selectedComponent.color || '#ff0000'
+              color: selectedComponent.color || '#ff0000',
+              polarity: isReversed ? 'reversed' : 'normal'
             })
             setIsPlacingLED(false)
             setLEDStartPosition(null)
@@ -141,6 +159,23 @@ export function Protoboard() {
           }
         }
       }
+    } else if (selectedComponent.type === 'switch') {
+      // Place switch immediately on single click
+      const switchId = Date.now().toString()
+      // Calculate adjacent position for switch connection (right side)
+      const row = Math.round((position[2] + 1.8) / 0.3)
+      const col = Math.round((position[0] + 3.6) / 0.3)
+      const endPosition = getHolePosition(row, col + 1) // Connect to adjacent hole
+      
+      addComponent({
+        id: switchId,
+        type: 'switch',
+        position: position,
+        endPosition: endPosition,
+        color: selectedComponent.color || '#2a2a2a',
+        isOn: false
+      })
+      setIsPlacingSwitch(false)
     }
   }
 
@@ -218,6 +253,7 @@ export function Protoboard() {
             />
           )
         } else if (component.type === 'led' && component.endPosition) {
+          const circuitState = circuitSimulation?.components[component.id]
           return (
             <LED3D
               key={component.id}
@@ -226,9 +262,13 @@ export function Protoboard() {
               color={component.color || '#ff0000'}
               onClick={() => handleComponentClick(component.id)}
               isDeleteMode={isDeleteMode}
+              componentId={component.id}
+              circuitState={circuitState}
+              polarity={component.polarity}
             />
           )
         } else if (component.type === 'wire' && component.startPosition && component.endPosition) {
+          const circuitState = circuitSimulation?.components[component.id]
           return (
             <Wire3D
               key={component.id}
@@ -237,6 +277,22 @@ export function Protoboard() {
               color={component.color || '#000000'}
               onClick={() => handleComponentClick(component.id)}
               isDeleteMode={isDeleteMode}
+              current={circuitState?.current || 0}
+              showCurrentFlow={circuitSimulation?.isComplete || false}
+            />
+          )
+        } else if (component.type === 'switch') {
+          return (
+            <Switch3D
+              key={component.id}
+              position={component.position}
+              endPosition={component.endPosition}
+              onClick={() => handleComponentClick(component.id)}
+              isDeleteMode={isDeleteMode}
+              componentId={component.id}
+              isOn={component.isOn || false}
+              onToggle={(isOn) => handleSwitchToggle(component.id, isOn)}
+              isPlacingWire={isPlacingWire}
             />
           )
         }

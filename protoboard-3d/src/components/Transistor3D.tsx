@@ -12,7 +12,7 @@ interface Transistor3DProps {
 }
 
 const Transistor3D = forwardRef<THREE.Group, Transistor3DProps>(
-  ({ position, endPosition, model, onClick, isDeleteMode }, ref) => {
+  ({ position, endPosition, onClick, isDeleteMode }, ref) => {
     // Calculate direction and length between two pins (always 2 pins apart)
     const dx = endPosition[0] - position[0]
     const dz = endPosition[2] - position[2]
@@ -26,7 +26,15 @@ const Transistor3D = forwardRef<THREE.Group, Transistor3DProps>(
     ]
 
     return (
-      <group ref={ref} position={midPoint} rotation={[0, -angle, 0]} onClick={onClick}>
+      <group 
+        ref={ref} 
+        position={midPoint} 
+        rotation={[0, -angle, 0]} 
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick?.()
+        }}
+      >
         {/* Transistor body - black cylindrical package */}
         <mesh position={[0, 0, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[0.1, 0.1, length * 0.8]} />

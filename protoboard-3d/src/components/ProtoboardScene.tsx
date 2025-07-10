@@ -1,13 +1,13 @@
 'use client'
 
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Grid } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei'
 import { Protoboard } from './Protoboard'
 import Battery3D from './Battery3D'
 import { useComponents } from '@/contexts/ComponentContext'
 
 export default function ProtoboardScene() {
-  const { selectedComponent, addComponent, isPlacingWire, setIsPlacingWire, wireStartPosition, setWireStartPosition } = useComponents()
+  const { selectedComponent, isPlacingWire, setIsPlacingWire, setWireStartPosition } = useComponents()
 
   const handleBatteryTerminalClick = (terminal: 'positive' | 'negative') => {
     if (selectedComponent?.type === 'wire' && !isPlacingWire) {
@@ -52,6 +52,7 @@ export default function ProtoboardScene() {
           minDistance={3}
           maxDistance={50}
           target={[0, 0, 0]}
+          makeDefault
         />
       </Canvas>
     </div>
